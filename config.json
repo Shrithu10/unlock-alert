@@ -1,0 +1,8 @@
+{
+  "ntfyServer": "https://ntfy.sh",
+  "ntfyTopic": "",
+  "notifyFailed": true,
+  "notifyUnlock": true,
+  "notifyWake": true,
+  "notifyBoot": true
+}

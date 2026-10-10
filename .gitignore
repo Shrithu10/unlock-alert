@@ -1,0 +1,5 @@
+# Runtime files (normally live in C:\ProgramData\UnlockAlert, never here)
+alerts.log
+watcher-heartbeat.txt
+last-*.txt
+body-*.txt

@@ -65,6 +65,14 @@ $time = Get-Date -Format 'HH:mm:ss, ddd d MMM'
 $how = $logonTypes[$LogonType]
 if (-not $how -and $LogonType) { $how = "logon type $LogonType" }
 
+# Personal link to the remote web page; the command topic rides in the "#" part,
+# which browsers never send to the page's host.
+$remoteUrl = ''
+if ($config.ntfyCommandTopic -and $config.remotePage) {
+    $remoteUrl = "{0}#c={1}" -f $config.remotePage, $config.ntfyCommandTopic
+    if ($config.ntfyServer.TrimEnd('/') -ne 'https://ntfy.sh') { $remoteUrl += "&s=" + [uri]::EscapeDataString($config.ntfyServer) }
+}
+
 switch ($Kind) {
     'Failed' {
         if (-not $config.notifyFailed) { exit }
@@ -110,10 +118,8 @@ switch ($Kind) {
     'Test' {
         $title = "Unlock Alert is set up on $computer"
         $body = "$time`nYou'll get a notification here for failed sign-ins, unlocks and wakes."
-        if ($config.ntfyCommandTopic) {
-            # Links that work any time, even with no recent alert: save them to the phone's home screen.
-            $cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
-            $body += "`n`nRemote control, save these to your home screen (keep them private):`nLock: ${cmdBase}lock`nStatus: ${cmdBase}status"
+        if ($remoteUrl) {
+            $body += "`n`nYour laptop remote (bookmark it, keep it private):`n$remoteUrl"
         }
         $tags = 'white_check_mark'
     }
@@ -132,6 +138,8 @@ if ($config.ntfyCommandTopic) {
     $cmdUrl = "{0}/{1}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
     $headers['Actions'] = "http, Lock now, $cmdUrl, body=lock, clear=true; http, Check status, $cmdUrl, body=status, clear=true"
 }
+# Tapping the notification itself opens the remote page.
+if ($remoteUrl) { $headers['Click'] = $remoteUrl }
 
 # Right after boot/wake Wi-Fi may not be connected yet, so retry for ~3 minutes.
 # Send with Windows' built-in curl.exe, not Invoke-RestMethod: on some networks

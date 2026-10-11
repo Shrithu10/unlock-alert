@@ -2,6 +2,7 @@
   "ntfyServer": "https://ntfy.sh",
   "ntfyTopic": "",
   "ntfyCommandTopic": "",
+  "remotePage": "https://shrithu10.github.io/unlock-alert/",
   "priority": "urgent",
   "notifyFailed": true,
   "notifyUnlock": true,

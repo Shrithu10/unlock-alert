@@ -131,29 +131,42 @@ function Invoke-PhoneCommands {
         $msg = $line | ConvertFrom-Json
         if ($msg.event -ne 'message') { continue }
         $script:cmdSince = $msg.id
-        $command = "$($msg.message)".Trim().ToLower()
-        Write-Log "watcher: phone command '$command'"
-        switch ($command) {
-            'status' {
-                $s = Get-LaptopState
-                Send-Alert 'Status' @{ Status = $s.State; SubStatus = $s.Detail }
-            }
-            'lock' {
-                $s = Get-LaptopState
-                if ($s.State -ne 'UNLOCKED') {
-                    Send-Alert 'Status' @{ Status = $s.State; SubStatus = "Already locked. $($s.Detail)" }
-                    continue
-                }
+        $text = "$($msg.message)".Trim()
+        if ($text.StartsWith('state:')) { continue }  # our own reply to the web page
+
+        # "web:lock" / "web:status" come from the remote page and get a quiet reply
+        # on this topic; plain "lock" / "status" come from notification buttons or
+        # links and get a reply notification.
+        $fromWeb = $text.ToLower().StartsWith('web:')
+        $command = if ($fromWeb) { $text.Substring(4).ToLower() } else { $text.ToLower() }
+        Write-Log "watcher: phone command '$command'$(if ($fromWeb) { ' (web)' })"
+        if ($command -notin 'status', 'lock') { Write-Log "watcher: ignored unknown command '$command'"; continue }
+
+        $s = Get-LaptopState
+        if ($command -eq 'lock') {
+            if ($s.State -eq 'UNLOCKED') {
                 # Locking has to happen inside the user's session, so it's a task that runs as them.
                 try { Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Lock' } catch { Write-Log "watcher: lock task: $($_.Exception.Message)" }
                 Start-Sleep -Seconds 3
                 $s = Get-LaptopState
-                $detail = if ($s.State -eq 'UNLOCKED') { 'Lock was sent but it still looks unlocked.' } else { 'Locked from your phone.' }
-                Send-Alert 'Status' @{ Status = $s.State; SubStatus = $detail }
+                $s.Detail = if ($s.State -eq 'UNLOCKED') { 'Lock was sent but it still looks unlocked.' } else { 'Locked from your phone.' }
+            } else {
+                $s.Detail = "Already locked. $($s.Detail)"
             }
-            default { Write-Log "watcher: ignored unknown command '$command'" }
         }
+        if ($fromWeb) { Send-State $s } else { Send-Alert 'Status' @{ Status = $s.State; SubStatus = $s.Detail } }
     }
+}
+
+# Reply to the remote web page: a "state:{json}" message on the command topic,
+# which the page polls for. No notification, so checking doesn't buzz the phone.
+function Send-State($s) {
+    $json = @{ state = $s.State; detail = $s.Detail } | ConvertTo-Json -Compress
+    $stateFile = Join-Path $dir ("state-{0}.txt" -f [guid]::NewGuid())
+    [System.IO.File]::WriteAllText($stateFile, "state:$json")
+    $url = "{0}/{1}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+    & $curl -sS --max-time 15 -o NUL --data-binary "@$stateFile" $url 2>$null
+    [System.IO.File]::Delete($stateFile)
 }
 
 while ($true) {

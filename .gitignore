@@ -3,3 +3,4 @@ alerts.log
 watcher-heartbeat.txt
 last-*.txt
 body-*.txt
+state-*.txt

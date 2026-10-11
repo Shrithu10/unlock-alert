@@ -104,8 +104,60 @@ try {
     Write-Log "watcher: boot check failed: $($_.Exception.Message)"
 }
 
+# --- Commands from the phone -------------------------------------------------
+# The notification buttons post "lock" or "status" to a second private topic.
+# We poll it every ~10 s with curl. Only these two harmless commands exist.
+$config = Get-Content (Join-Path $dir 'config.json') -Raw | ConvertFrom-Json
+$curl = Join-Path $env:SystemRoot 'System32\curl.exe'
+$cmdSince = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()  # ignore anything sent before we started
+
+function Get-LaptopState {
+    $user = (Get-CimInstance Win32_ComputerSystem).UserName
+    if (-not $user) { return @{ State = 'at the sign-in screen'; Detail = 'Nobody is signed in.' } }
+    # LogonUI is what draws the lock screen, so if it's running the screen is locked.
+    if (Get-Process LogonUI -ErrorAction SilentlyContinue) {
+        return @{ State = 'LOCKED'; Detail = "$user is signed in, lock screen showing." }
+    }
+    @{ State = 'UNLOCKED'; Detail = "In use by $user right now." }
+}
+
+function Invoke-PhoneCommands {
+    if (-not $config.ntfyCommandTopic) { return }
+    $url = "{0}/{1}/json?poll=1&since={2}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic, $script:cmdSince
+    $lines = & $curl -sS --max-time 10 $url 2>$null
+    if ($LASTEXITCODE -ne 0) { return }  # offline; try again next round
+    foreach ($line in @($lines)) {
+        if (-not $line) { continue }
+        $msg = $line | ConvertFrom-Json
+        if ($msg.event -ne 'message') { continue }
+        $script:cmdSince = $msg.id
+        $command = "$($msg.message)".Trim().ToLower()
+        Write-Log "watcher: phone command '$command'"
+        switch ($command) {
+            'status' {
+                $s = Get-LaptopState
+                Send-Alert 'Status' @{ Status = $s.State; SubStatus = $s.Detail }
+            }
+            'lock' {
+                $s = Get-LaptopState
+                if ($s.State -ne 'UNLOCKED') {
+                    Send-Alert 'Status' @{ Status = $s.State; SubStatus = "Already locked. $($s.Detail)" }
+                    continue
+                }
+                # Locking has to happen inside the user's session, so it's a task that runs as them.
+                try { Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Lock' } catch { Write-Log "watcher: lock task: $($_.Exception.Message)" }
+                Start-Sleep -Seconds 3
+                $s = Get-LaptopState
+                $detail = if ($s.State -eq 'UNLOCKED') { 'Lock was sent but it still looks unlocked.' } else { 'Locked from your phone.' }
+                Send-Alert 'Status' @{ Status = $s.State; SubStatus = $detail }
+            }
+            default { Write-Log "watcher: ignored unknown command '$command'" }
+        }
+    }
+}
+
 while ($true) {
-    $ev = Wait-Event -Timeout 60
+    $ev = Wait-Event -Timeout 10
     if ($ev) {
         try {
             if ($ev.SourceEventArgs.EventException) { throw $ev.SourceEventArgs.EventException }
@@ -115,6 +167,7 @@ while ($true) {
         }
         Remove-Event -EventIdentifier $ev.EventIdentifier
     }
+    try { Invoke-PhoneCommands } catch { Write-Log "watcher: commands: $($_.Exception.Message)" }
     Set-Content -Path $heartbeat -Value (Get-Date -Format o)
     Start-Watchers  # re-arm anything that got disabled
 }

@@ -1,5 +1,5 @@
 #Requires -RunAsAdministrator
-foreach ($name in 'Watcher', 'Failed', 'FailedPin', 'Unlock', 'Wake') {
+foreach ($name in 'Watcher', 'Lock', 'Failed', 'FailedPin', 'Unlock', 'Wake') {
     Unregister-ScheduledTask -TaskName $name -TaskPath '\UnlockAlert\' -Confirm:$false -ErrorAction SilentlyContinue
 }
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |

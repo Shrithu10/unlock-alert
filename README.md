@@ -18,16 +18,26 @@ How: Windows Hello PIN
 
 ## What you get notified about
 
-| Event | Phone alert |
+| Event | Icon |
 |---|---|
-| Wrong **PIN** (Windows Hello) | 🚨 urgent, loud |
-| Wrong **password** | 🚨 urgent, loud |
-| Laptop **switched on** (full boot) | ⚡ high |
-| Successful sign-in / unlock | 🔓 low, silent |
-| Woke from sleep / lid opened | 👀 low, silent |
+| Wrong **PIN** (Windows Hello) | 🚨 |
+| Wrong **password** | 🚨 |
+| Laptop **switched on** (full boot) | ⚡ |
+| Successful sign-in / unlock | 🔓 |
+| Woke from sleep / lid opened | 👀 |
 
-The silent ones give you a record without buzzing every time *you* unlock it. You can turn any of them off.
+Every alert uses the same priority (**urgent** by default), so you get the same sound every time. Set `"priority"` in the config to `high`, `default` or `low` to tone it down, and turn off any type you don't want.
 
+## Control it from your phone
+
+Every alert has two buttons:
+
+- **Check status** → replies with `MY-LAPTOP is LOCKED`, `is UNLOCKED` (and who's using it) or `is at the sign-in screen`.
+- **Lock now** → locks the laptop immediately if it's unlocked, then confirms.
+
+The buttons post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. You can also send `status` or `lock` to that topic from anywhere, for example with `curl -d lock ntfy.sh/<command topic>`. These are the only two commands, so even someone who learned the command topic could do nothing worse than lock your laptop.
+
+If the laptop is asleep, the command runs as soon as it wakes.
 ## Requirements
 
 - Windows 10 or 11 (Home works)
@@ -67,7 +77,7 @@ Install **ntfy** ([Android](https://play.google.com/store/apps/details?id=io.hec
 > **Android:** go to Settings → Apps → ntfy → Battery and set it to **Unrestricted**, otherwise the phone may hold notifications back.
 
 ### 4. Test it
-Press **Win + L**, type a wrong PIN, then unlock normally. You should get a loud **FAILED sign-in** alert, then a quiet **unlocked** one.
+Press **Win + L**, type a wrong PIN, then unlock normally. You should get a **FAILED sign-in** alert, then an **unlocked** one, both with the same sound.
 
 ## Settings
 
@@ -77,6 +87,8 @@ Edit `C:\ProgramData\UnlockAlert\config.json` (as admin):
 {
   "ntfyServer": "https://ntfy.sh",
   "ntfyTopic": "unlock-alert-…",
+  "ntfyCommandTopic": "unlock-cmd-…",
+  "priority": "urgent",
   "notifyFailed": true,
   "notifyUnlock": true,
   "notifyWake": true,
@@ -107,6 +119,7 @@ powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 ```
 
 - **`watcher.ps1`** is one long-running process that subscribes to the event logs. A single always-running process is used instead of one scheduled task per event because Windows stops starting event-triggered tasks once Energy Saver turns on; a process that's already running keeps going. Task Scheduler (re)starts it at boot, at logon and every 5 minutes, and it restarts if it crashes.
+- **Phone commands:** the watcher also polls the command topic every 10 s. `lock` runs a small task in your own session (`rundll32 user32.dll,LockWorkStation`), because Windows only allows a session to be locked from inside it.
 - **`alert.ps1`** formats the message and sends it with Windows' built-in `curl.exe`. If the network isn't up yet (right after boot or wake), it retries for 3 minutes.
 - **`install.ps1`** copies everything to `C:\ProgramData\UnlockAlert` and locks the folder so only admins can change the scripts, because they run as SYSTEM. It also makes sure Windows logs sign-in attempts, and registers the task.
 

@@ -140,9 +140,18 @@ function Invoke-PhoneCommands {
         $fromWeb = $text.ToLower().StartsWith('web:')
         $command = if ($fromWeb) { $text.Substring(4).ToLower() } else { $text.ToLower() }
         Write-Log "watcher: phone command '$command'$(if ($fromWeb) { ' (web)' })"
-        if ($command -notin 'status', 'lock') { Write-Log "watcher: ignored unknown command '$command'"; continue }
+        if ($command -notin 'status', 'lock', 'screenshot') { Write-Log "watcher: ignored unknown command '$command'"; continue }
 
         $s = Get-LaptopState
+        if ($command -eq 'screenshot') {
+            if ($s.State -eq 'UNLOCKED') {
+                # Capturing has to happen in the user's session; the image itself is the reply.
+                try { Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Screenshot' } catch { Write-Log "watcher: screenshot task: $($_.Exception.Message)" }
+                if ($fromWeb) { $s.Detail = 'Screenshot is on its way to your notifications.'; Send-State $s }
+                continue
+            }
+            $s.Detail = "No screenshot, the screen is locked. $($s.Detail)"
+        }
         if ($command -eq 'lock') {
             if ($s.State -eq 'UNLOCKED') {
                 # Locking has to happen inside the user's session, so it's a task that runs as them.

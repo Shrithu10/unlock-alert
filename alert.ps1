@@ -120,6 +120,9 @@ switch ($Kind) {
         $body = "$time`nYou'll get a notification here for failed sign-ins, unlocks and wakes."
         if ($remoteUrl) {
             $body += "`n`nYour laptop remote (bookmark it, keep it private):`n$remoteUrl"
+        } elseif ($config.ntfyCommandTopic) {
+            $cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+            $body += "`n`nPhone links (bookmark them, keep them private):`nLock: ${cmdBase}lock`nStatus: ${cmdBase}status`nScreenshot: ${cmdBase}screenshot"
         }
         $tags = 'white_check_mark'
     }
@@ -136,7 +139,7 @@ $headers = @{ Title = $title; Priority = $priority; Tags = $tags }
 # topic that watcher.ps1 polls.
 if ($config.ntfyCommandTopic) {
     $cmdUrl = "{0}/{1}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
-    $headers['Actions'] = "http, Lock now, $cmdUrl, body=lock, clear=true; http, Check status, $cmdUrl, body=status, clear=true"
+    $headers['Actions'] = "http, Lock now, $cmdUrl, body=lock, clear=true; http, Check status, $cmdUrl, body=status, clear=true; http, Screenshot, $cmdUrl, body=screenshot, clear=true"
 }
 # Tapping the notification itself opens the remote page.
 if ($remoteUrl) { $headers['Click'] = $remoteUrl }

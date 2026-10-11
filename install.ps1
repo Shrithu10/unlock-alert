@@ -7,7 +7,7 @@ $src = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dest = Join-Path $env:ProgramData 'UnlockAlert'
 
 # Remove the old one-task-per-event setup, and stop a running watcher before upgrading it.
-foreach ($old in 'Failed', 'FailedPin', 'Unlock', 'Wake', 'Watcher', 'Lock') {
+foreach ($old in 'Failed', 'FailedPin', 'Unlock', 'Wake', 'Watcher', 'Lock', 'Screenshot') {
     Unregister-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName $old -Confirm:$false -ErrorAction SilentlyContinue
 }
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
@@ -15,7 +15,7 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-foreach ($f in 'alert.ps1', 'watcher.ps1') { Copy-Item (Join-Path $src $f) $dest -Force }
+foreach ($f in 'alert.ps1', 'watcher.ps1', 'screenshot.ps1') { Copy-Item (Join-Path $src $f) $dest -Force }
 
 # Keep an existing config (and its topic) on reinstall.
 $configPath = Join-Path $dest 'config.json'
@@ -100,6 +100,11 @@ $lockXml = @"
 </Task>
 "@
 Register-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Lock' -Xml $lockXml -Force | Out-Null
+# Screenshot task: same idea as Lock. Started by the watcher on a "screenshot"
+# command; it has to run as you, because only your session can see the screen.
+$shotArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$dest\screenshot.ps1&quot;"
+$shotXml = $lockXml.Replace('lock this PC on request from your phone.', 'send a screenshot to your phone on request.').Replace('<Command>rundll32.exe</Command><Arguments>user32.dll,LockWorkStation</Arguments>', "<Command>powershell.exe</Command><Arguments>$shotArgs</Arguments>").Replace('<ExecutionTimeLimit>PT1M</ExecutionTimeLimit>', '<ExecutionTimeLimit>PT3M</ExecutionTimeLimit>')
+Register-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Screenshot' -Xml $shotXml -Force | Out-Null
 Write-Host "Remote lock enabled for $env:USERDOMAIN\$env:USERNAME."
 Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Watcher'
 Write-Host 'Watcher installed and started.'
@@ -116,10 +121,18 @@ Write-Host ''
 Write-Host 'On your phone: ntfy app -> + -> subscribe to topic:' -ForegroundColor Green
 Write-Host "  $($config.ntfyTopic)"
 Write-Host ''
-Write-Host 'Every alert has "Lock now" and "Check status" buttons to control the laptop from your phone.'
+Write-Host 'Every alert has "Lock now", "Check status" and "Screenshot" buttons to control the laptop from your phone.'
 if ($config.remotePage) {
     Write-Host 'Your laptop remote: open this on your phone and bookmark it. Keep it private:' -ForegroundColor Green
     Write-Host ("  {0}#c={1}" -f $config.remotePage, $config.ntfyCommandTopic)
     Write-Host '(It is also in the test notification, and tapping any alert opens it.)'
+} else {
+    # No remote page configured: direct links work too (open them on your phone, bookmark them).
+    $cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+    Write-Host 'Phone links (open on your phone and bookmark them; keep them private):' -ForegroundColor Green
+    Write-Host "  Lock:       ${cmdBase}lock"
+    Write-Host "  Status:     ${cmdBase}status"
+    Write-Host "  Screenshot: ${cmdBase}screenshot"
+    Write-Host '(They are also in the test notification on your phone.)'
 }
 Write-Host "Config: $configPath   Log: $dest\alerts.log"

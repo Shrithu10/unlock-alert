@@ -30,14 +30,25 @@ Every alert uses the same priority (**urgent** by default), so you get the same 
 
 ## Control it from your phone
 
-Every alert has two buttons:
+Every alert has three buttons:
 
-- **Check status** → replies `MY-LAPTOP is LOCKED`, `is UNLOCKED` (and who's using it) or `is at the sign-in screen`.
 - **Lock now** → locks the laptop immediately if it's unlocked, then confirms.
+- **Check status** → replies `MY-LAPTOP is LOCKED`, `is UNLOCKED` (and who's using it) or `is at the sign-in screen`.
+- **Screenshot** → if the laptop is unlocked, sends a picture of the screen (all monitors) to your phone. If it's locked, it just replies that it's locked.
 
-The buttons post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. You can also send `status` or `lock` to it from anywhere, e.g. `curl -d lock ntfy.sh/<command topic>`. These are the only two commands, so even someone who learned the command topic could do nothing worse than lock your laptop. If the laptop is asleep, the command runs as soon as it wakes.
+The installer also prints direct links you can bookmark, so you don't need a recent alert:
 
-Optional: set `remotePage` in the config to the address of a web page that sends `web:status` / `web:lock` to the command topic. Tapping an alert then opens that page.
+```
+https://ntfy.sh/<command topic>/publish?message=lock
+https://ntfy.sh/<command topic>/publish?message=status
+https://ntfy.sh/<command topic>/publish?message=screenshot
+```
+
+The buttons and links post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. If the laptop is asleep, the command runs as soon as it wakes. Only these three commands exist. Someone who learned the command topic could lock the laptop, check its state or trigger a screenshot, but the screenshot is delivered to your *alert* topic, so they'd need that too to see it.
+
+> **Screenshots pass through ntfy.sh.** Anyone who knows your alert topic can view them. ntfy.sh deletes attachments after a few hours. Keep both topics private, or [self-host ntfy](https://docs.ntfy.sh/install/).
+
+Optional: set `remotePage` in the config to the address of a web page that sends `web:status` / `web:lock` / `web:screenshot` to the command topic. Tapping an alert then opens that page.
 ## Requirements
 
 - Windows 10 or 11 (Home works)
@@ -126,7 +137,7 @@ powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
 
 ## Privacy
 
-- Nothing leaves your laptop except the notification text itself: time, reason, and username for password attempts.
+- Nothing leaves your laptop except the notification text (time, reason, username for password attempts) and screenshots you ask for.
 - ntfy topics are public **to anyone who knows the name**, which is why the installer generates a random 20-character one. Don't share it.
 - Want full control? [Self-host ntfy](https://docs.ntfy.sh/install/) and set `ntfyServer` to your own server.
 

@@ -30,23 +30,17 @@ Every alert uses the same priority (**urgent** by default), so you get the same 
 
 ## Control it from your phone
 
-Every alert has two buttons:
-
-- **Check status** → replies with `MY-LAPTOP is LOCKED`, `is UNLOCKED` (and who's using it) or `is at the sign-in screen`.
-- **Lock now** → locks the laptop immediately if it's unlocked, then confirms.
-
-**No recent alert to tap?** The installer prints two links (they're also in the test notification):
+The installer gives you a personal **remote link**. Open it on your phone and bookmark it (or add it to your home screen):
 
 ```
-Lock:   https://ntfy.sh/<command topic>/publish?message=lock
-Status: https://ntfy.sh/<command topic>/publish?message=status
+https://shrithu10.github.io/unlock-alert/#c=<your command topic>
 ```
 
-Save them to your phone's home screen (in the browser: Share → *Add to Home Screen*). Tapping **Lock** locks the laptop within about 10 seconds, whenever it's open.
+It shows whether the laptop is **Locked**, **Unlocked** (and who's using it) or **at the sign-in screen**, with one big **Lock it now** button. Tapping any alert also opens it. The laptop checks for commands every 10 seconds, so answers take up to about 10 seconds. If it's asleep or off, the page says so, and a lock is carried out as soon as it wakes.
 
-The buttons and links post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. You can also send `status` or `lock` to that topic from anywhere, for example with `curl -d lock ntfy.sh/<command topic>`. These are the only two commands, so even someone who learned the command topic could do nothing worse than lock your laptop.
+Alerts also have **Lock now** and **Check status** buttons, if you'd rather not open the page.
 
-If the laptop is asleep, the command runs as soon as it wakes.
+**Is the link safe?** The secret part comes after the `#`. Browsers never send that part to GitHub; the page uses it only to talk to ntfy. The laptop accepts just two commands, `status` and `lock`, so anyone who got your link could at most lock your laptop or see whether it's in use. They can't unlock it or run anything else.
 ## Requirements
 
 - Windows 10 or 11 (Home works)
@@ -97,6 +91,7 @@ Edit `C:\ProgramData\UnlockAlert\config.json` (as admin):
   "ntfyServer": "https://ntfy.sh",
   "ntfyTopic": "unlock-alert-…",
   "ntfyCommandTopic": "unlock-cmd-…",
+  "remotePage": "https://shrithu10.github.io/unlock-alert/",
   "priority": "urgent",
   "notifyFailed": true,
   "notifyUnlock": true,

@@ -110,6 +110,11 @@ switch ($Kind) {
     'Test' {
         $title = "Unlock Alert is set up on $computer"
         $body = "$time`nYou'll get a notification here for failed sign-ins, unlocks and wakes."
+        if ($config.ntfyCommandTopic) {
+            # Links that work any time, even with no recent alert: save them to the phone's home screen.
+            $cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+            $body += "`n`nRemote control, save these to your home screen (keep them private):`nLock: ${cmdBase}lock`nStatus: ${cmdBase}status"
+        }
         $tags = 'white_check_mark'
     }
 }

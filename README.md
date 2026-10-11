@@ -35,7 +35,16 @@ Every alert has two buttons:
 - **Check status** → replies with `MY-LAPTOP is LOCKED`, `is UNLOCKED` (and who's using it) or `is at the sign-in screen`.
 - **Lock now** → locks the laptop immediately if it's unlocked, then confirms.
 
-The buttons post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. You can also send `status` or `lock` to that topic from anywhere, for example with `curl -d lock ntfy.sh/<command topic>`. These are the only two commands, so even someone who learned the command topic could do nothing worse than lock your laptop.
+**No recent alert to tap?** The installer prints two links (they're also in the test notification):
+
+```
+Lock:   https://ntfy.sh/<command topic>/publish?message=lock
+Status: https://ntfy.sh/<command topic>/publish?message=status
+```
+
+Save them to your phone's home screen (in the browser: Share → *Add to Home Screen*). Tapping **Lock** locks the laptop within about 10 seconds, whenever it's open.
+
+The buttons and links post to a second private topic (`ntfyCommandTopic`), which the laptop checks every 10 seconds. You can also send `status` or `lock` to that topic from anywhere, for example with `curl -d lock ntfy.sh/<command topic>`. These are the only two commands, so even someone who learned the command topic could do nothing worse than lock your laptop.
 
 If the laptop is asleep, the command runs as soon as it wakes.
 ## Requirements

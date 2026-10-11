@@ -117,4 +117,9 @@ Write-Host 'On your phone: ntfy app -> + -> subscribe to topic:' -ForegroundColo
 Write-Host "  $($config.ntfyTopic)"
 Write-Host ''
 Write-Host 'Every alert has "Lock now" and "Check status" buttons to control the laptop from your phone.'
+Write-Host 'To lock it any time (no alert needed), save these links to your phone''s home screen. Keep them private:' -ForegroundColor Green
+$cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+Write-Host "  Lock:   ${cmdBase}lock"
+Write-Host "  Status: ${cmdBase}status"
+Write-Host '(They are also in the test notification on your phone.)'
 Write-Host "Config: $configPath   Log: $dest\alerts.log"

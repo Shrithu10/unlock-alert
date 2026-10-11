@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Laptop Remote</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+    --ok: #1f8a4c; --ok-bg: #e7f5ec; --warn: #c2410c; --warn-bg: #fdeee5;
+    --idle: #6b6b66; --idle-bg: #efefeb; --btn: #1d1d1b; --btn-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1e1e1c; --text: #f2f2ee; --muted: #a3a39c; --line: #2e2e2b;
+      --ok: #4ade80; --ok-bg: #12301f; --warn: #fb923c; --warn-bg: #3a1d0c;
+      --idle: #a3a39c; --idle-bg: #262624; --btn: #f2f2ee; --btn-text: #141413;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100dvh; display: flex; justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0; letter-spacing: .02em; text-transform: uppercase; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    padding: 28px 22px; text-align: center;
+  }
+  .badge {
+    width: 96px; height: 96px; margin: 0 auto 16px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 44px;
+    background: var(--idle-bg); transition: background .2s;
+  }
+  .state { font-size: 28px; font-weight: 700; margin: 0 0 6px; }
+  .detail { color: var(--muted); margin: 0; min-height: 1.45em; }
+  .ok .badge { background: var(--ok-bg); } .ok .state { color: var(--ok); }
+  .warn .badge { background: var(--warn-bg); } .warn .state { color: var(--warn); }
+  .idle .state { color: var(--idle); }
+  .busy .badge { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  button {
+    font: inherit; font-size: 18px; font-weight: 650; width: 100%; min-height: 58px;
+    border-radius: 16px; border: 0; cursor: pointer;
+    background: var(--btn); color: var(--btn-text);
+  }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); font-size: 16px; min-height: 50px; }
+  button:disabled { opacity: .4; cursor: default; }
+  .meta { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
+  .setup { text-align: left; }
+  .setup p { margin: 0 0 10px; }
+  code { font-size: 13px; background: var(--idle-bg); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Laptop Remote</h1>
+
+  <section id="card" class="card idle">
+    <div class="badge" id="icon">💻</div>
+    <p class="state" id="state">Checking…</p>
+    <p class="detail" id="detail"></p>
+  </section>
+
+  <button id="lock" disabled>🔒 Lock it now</button>
+  <button id="refresh" class="secondary" disabled>Check again</button>
+  <p class="meta" id="meta"></p>
+
+  <section id="setup" class="card setup" hidden>
+    <p><strong>This link is missing your laptop's code.</strong></p>
+    <p>Run <code>install.ps1</code> from <a href="https://github.com/Shrithu10/unlock-alert">Unlock Alert</a> on your laptop. It prints your personal remote link. Open that link here and bookmark it.</p>
+  </section>
+</main>
+
+<script>
+  // Your private command topic lives after the "#" in the link. Browsers never
+  // send that part to the web server; it only goes to ntfy, from this page.
+  const params = new URLSearchParams(location.hash.slice(1));
+  const topic = params.get('c');
+  const server = (params.get('s') || 'https://ntfy.sh').replace(/\/+$/, '');
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let busy = false;
+
+  function show(kind, icon, state, detail) {
+    $('card').className = 'card ' + kind;
+    $('icon').textContent = icon;
+    $('state').textContent = state;
+    $('detail').textContent = detail || '';
+  }
+
+  // Post a command; the laptop checks the topic every ~10 s and replies on the
+  // same topic with a message starting "state:".
+  async function ask(command) {
+    const res = await fetch(`${server}/${topic}`, { method: 'POST', body: 'web:' + command });
+    if (!res.ok) throw new Error('ntfy said ' + res.status);
+    const sent = await res.json();
+    const deadline = Date.now() + 40000;
+    while (Date.now() < deadline) {
+      await sleep(2000);
+      const poll = await fetch(`${server}/${topic}/json?poll=1&since=${sent.id}`);
+      const lines = (await poll.text()).trim().split('\n').filter(Boolean);
+      for (const line of lines) {
+        const m = JSON.parse(line);
+        if (m.event === 'message' && typeof m.message === 'string' && m.message.startsWith('state:')) {
+          return JSON.parse(m.message.slice(6));
+        }
+      }
+    }
+    return null;
+  }
+
+  function render(reply) {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!reply) {
+      show('idle', '💤', 'No answer', 'The laptop is off, asleep or offline. It will act on this as soon as it wakes.');
+      $('lock').disabled = false;
+    } else if (reply.state === 'LOCKED') {
+      show('ok', '🔒', 'Locked', reply.detail);
+      $('lock').disabled = true;
+    } else if (reply.state === 'UNLOCKED') {
+      show('warn', '🔓', 'Unlocked', reply.detail);
+      $('lock').disabled = false;
+    } else {
+      show('ok', '🔒', 'At sign-in screen', reply.detail);
+      $('lock').disabled = true;
+    }
+    $('meta').textContent = 'Checked at ' + now;
+  }
+
+  async function run(command) {
+    if (busy) return;
+    busy = true;
+    $('lock').disabled = true; $('refresh').disabled = true;
+    $('card').classList.add('busy');
+    $('meta').textContent = 'Asking your laptop… it checks every 10 seconds.';
+    if (command === 'lock') { $('state').textContent = 'Locking…'; $('detail').textContent = ''; }
+    try {
+      render(await ask(command));
+    } catch (e) {
+      show('idle', '⚠️', 'Could not reach ntfy', 'Check your phone\'s internet, then try again.');
+      $('lock').disabled = false;
+      $('meta').textContent = '';
+    } finally {
+      $('card').classList.remove('busy');
+      $('refresh').disabled = false;
+      busy = false;
+    }
+  }
+
+  if (!topic) {
+    $('card').hidden = true; $('lock').hidden = true; $('refresh').hidden = true;
+    $('setup').hidden = false;
+  } else {
+    $('lock').addEventListener('click', () => run('lock'));
+    $('refresh').addEventListener('click', () => run('status'));
+    run('status');
+  }
+</script>
+</body>
+</html>

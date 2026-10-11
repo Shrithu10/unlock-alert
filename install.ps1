@@ -117,7 +117,9 @@ Write-Host 'On your phone: ntfy app -> + -> subscribe to topic:' -ForegroundColo
 Write-Host "  $($config.ntfyTopic)"
 Write-Host ''
 Write-Host 'Every alert has "Lock now" and "Check status" buttons to control the laptop from your phone.'
-Write-Host 'Your laptop remote: open this on your phone and bookmark it. Keep it private:' -ForegroundColor Green
-Write-Host ("  {0}#c={1}" -f $config.remotePage, $config.ntfyCommandTopic)
-Write-Host '(It is also in the test notification, and tapping any alert opens it.)'
+if ($config.remotePage) {
+    Write-Host 'Your laptop remote: open this on your phone and bookmark it. Keep it private:' -ForegroundColor Green
+    Write-Host ("  {0}#c={1}" -f $config.remotePage, $config.ntfyCommandTopic)
+    Write-Host '(It is also in the test notification, and tapping any alert opens it.)'
+}
 Write-Host "Config: $configPath   Log: $dest\alerts.log"

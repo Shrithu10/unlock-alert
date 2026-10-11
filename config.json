@@ -1,6 +1,8 @@
 {
   "ntfyServer": "https://ntfy.sh",
   "ntfyTopic": "",
+  "ntfyCommandTopic": "",
+  "priority": "urgent",
   "notifyFailed": true,
   "notifyUnlock": true,
   "notifyWake": true,

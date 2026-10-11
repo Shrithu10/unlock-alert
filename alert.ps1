@@ -1,7 +1,7 @@
-﻿# Started by watcher.ps1 (as SYSTEM) for each logon/unlock/wake/boot event.
+# Started by watcher.ps1 (as SYSTEM) for each logon/unlock/wake/boot event.
 # Sends a push notification via ntfy and appends to a local log.
 param(
-    [ValidateSet('Failed', 'Unlock', 'Wake', 'Boot', 'Test')]
+    [ValidateSet('Failed', 'Unlock', 'Wake', 'Boot', 'Status', 'Test')]
     [string]$Kind = 'Test',
     [string]$User = '',
     [string]$Domain = '',
@@ -76,7 +76,7 @@ switch ($Kind) {
         # Hello PIN failures are logged under SYSTEM, which says nothing useful.
         if ($User -and $User -ne 'SYSTEM' -and $User -ne '-') { $body += "`nUser: $User" }
         if ($Ip -and $Ip -ne '-' -and $Ip -ne '127.0.0.1' -and $Ip -ne '::1') { $body += "`nFrom IP: $Ip" }
-        $priority = 'urgent'; $tags = 'rotating_light'
+        $tags = 'rotating_light'
     }
     'Unlock' {
         if (-not $config.notifyUnlock) { exit }
@@ -86,32 +86,47 @@ switch ($Kind) {
         if (Test-RecentlySent 'unlock' 20) { exit }
         $title = "$computer unlocked"
         $body = "$time`nUser: $User`nHow: $how"
-        $priority = 'low'; $tags = 'unlock'
+        $tags = 'unlock'
     }
     'Wake' {
         if (-not $config.notifyWake) { exit }
         if (Test-RecentlySent 'wake' 60) { exit }
         $title = "$computer woke up"
         $body = "$time`nLid opened or key/mouse pressed."
-        $priority = 'low'; $tags = 'eyes'
+        $tags = 'eyes'
     }
     'Boot' {
         if ($config.notifyBoot -eq $false) { exit }
         $title = "$computer was switched on"
         $body = "$time`nPowered on at $Status (full start, not just wake)."
-        $priority = 'high'; $tags = 'zap'
+        $tags = 'zap'
+    }
+    'Status' {
+        # Reply to a "status"/"lock" command from the phone (see watcher.ps1).
+        $title = "$computer is $Status"
+        $body = "$time`n$SubStatus"
+        $tags = if ($Status -eq 'UNLOCKED') { 'unlock' } else { 'lock' }
     }
     'Test' {
         $title = "Unlock Alert is set up on $computer"
         $body = "$time`nYou'll get a notification here for failed sign-ins, unlocks and wakes."
-        $priority = 'default'; $tags = 'white_check_mark'
+        $tags = 'white_check_mark'
     }
 }
 
 Write-Log ("{0}: {1}" -f $Kind, ($body -replace "`n", ' | '))
 
 $url = "{0}/{1}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyTopic
+# Every alert type uses the same priority (same sound on the phone); default urgent.
+$priority = if ($config.priority) { $config.priority } else { 'urgent' }
 $headers = @{ Title = $title; Priority = $priority; Tags = $tags }
+
+# Buttons on the notification: they post "lock"/"status" to the private command
+# topic that watcher.ps1 polls.
+if ($config.ntfyCommandTopic) {
+    $cmdUrl = "{0}/{1}" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
+    $headers['Actions'] = "http, Lock now, $cmdUrl, body=lock, clear=true; http, Check status, $cmdUrl, body=status, clear=true"
+}
 
 # Right after boot/wake Wi-Fi may not be connected yet, so retry for ~3 minutes.
 # Send with Windows' built-in curl.exe, not Invoke-RestMethod: on some networks

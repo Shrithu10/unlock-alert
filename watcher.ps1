@@ -140,9 +140,21 @@ function Invoke-PhoneCommands {
         $fromWeb = $text.ToLower().StartsWith('web:')
         $command = if ($fromWeb) { $text.Substring(4).ToLower() } else { $text.ToLower() }
         Write-Log "watcher: phone command '$command'$(if ($fromWeb) { ' (web)' })"
-        if ($command -notin 'status', 'lock', 'screenshot') { Write-Log "watcher: ignored unknown command '$command'"; continue }
+        if ($command -notin 'status', 'lock', 'screenshot', 'locate') { Write-Log "watcher: ignored unknown command '$command'"; continue }
 
         $s = Get-LaptopState
+        if ($command -eq 'locate') {
+            # Windows location only answers inside a user session (locked is fine),
+            # so use the task that runs as you; with nobody signed in, run it here
+            # and it falls back to the IP-based location.
+            if ($s.State -ne 'at the sign-in screen') {
+                try { Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Locate' } catch { Write-Log "watcher: locate task: $($_.Exception.Message)" }
+            } else {
+                Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $dir 'locate.ps1')`""
+            }
+            if ($fromWeb) { $s.Detail = 'Location is on its way to your notifications.'; Send-State $s }
+            continue
+        }
         if ($command -eq 'screenshot') {
             if ($s.State -eq 'UNLOCKED') {
                 # Capturing has to happen in the user's session; the image itself is the reply.

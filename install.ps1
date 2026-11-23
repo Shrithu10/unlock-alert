@@ -15,7 +15,7 @@ Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-foreach ($f in 'alert.ps1', 'watcher.ps1', 'screenshot.ps1') { Copy-Item (Join-Path $src $f) $dest -Force }
+foreach ($f in 'alert.ps1', 'watcher.ps1', 'screenshot.ps1', 'locate.ps1') { Copy-Item (Join-Path $src $f) $dest -Force }
 
 # Keep an existing config (and its topic) on reinstall.
 $configPath = Join-Path $dest 'config.json'
@@ -105,6 +105,10 @@ Register-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Lock' -Xml $lockXml 
 $shotArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$dest\screenshot.ps1&quot;"
 $shotXml = $lockXml.Replace('lock this PC on request from your phone.', 'send a screenshot to your phone on request.').Replace('<Command>rundll32.exe</Command><Arguments>user32.dll,LockWorkStation</Arguments>', "<Command>powershell.exe</Command><Arguments>$shotArgs</Arguments>").Replace('<ExecutionTimeLimit>PT1M</ExecutionTimeLimit>', '<ExecutionTimeLimit>PT3M</ExecutionTimeLimit>')
 Register-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Screenshot' -Xml $shotXml -Force | Out-Null
+# Locate task: same idea. Windows location only answers inside your own session.
+$locArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File &quot;$dest\locate.ps1&quot;"
+$locXml = $shotXml.Replace('send a screenshot to your phone on request.', 'send this laptop''s location to your phone on request.').Replace($shotArgs, $locArgs)
+Register-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Locate' -Xml $locXml -Force | Out-Null
 Write-Host "Remote lock enabled for $env:USERDOMAIN\$env:USERNAME."
 Start-ScheduledTask -TaskPath '\UnlockAlert\' -TaskName 'Watcher'
 Write-Host 'Watcher installed and started.'

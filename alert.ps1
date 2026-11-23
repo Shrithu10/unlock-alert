@@ -122,7 +122,7 @@ switch ($Kind) {
             $body += "`n`nYour laptop remote (bookmark it, keep it private):`n$remoteUrl"
         } elseif ($config.ntfyCommandTopic) {
             $cmdBase = "{0}/{1}/publish?message=" -f $config.ntfyServer.TrimEnd('/'), $config.ntfyCommandTopic
-            $body += "`n`nPhone links (bookmark them, keep them private):`nLock: ${cmdBase}lock`nStatus: ${cmdBase}status`nScreenshot: ${cmdBase}screenshot"
+            $body += "`n`nPhone links (bookmark them, keep them private):`nLock: ${cmdBase}lock`nStatus: ${cmdBase}status`nScreenshot: ${cmdBase}screenshot`nLocate: ${cmdBase}locate"
         }
         $tags = 'white_check_mark'
     }

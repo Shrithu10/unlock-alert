@@ -137,6 +137,13 @@ if ($config.remotePage) {
     Write-Host "  Lock:       ${cmdBase}lock"
     Write-Host "  Status:     ${cmdBase}status"
     Write-Host "  Screenshot: ${cmdBase}screenshot"
+    Write-Host "  Locate:     ${cmdBase}locate"
     Write-Host '(They are also in the test notification on your phone.)'
+}
+# Locate is only precise with Windows location on; say so once at install time.
+$loc = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location' -ErrorAction SilentlyContinue).Value
+if ($loc -ne 'Allow') {
+    Write-Host 'Windows location is off, so Locate will only give a city-level position (from your internet IP).' -ForegroundColor Yellow
+    Write-Host 'For a precise one: Settings > Privacy & security > Location > turn on Location services.' -ForegroundColor Yellow
 }
 Write-Host "Config: $configPath   Log: $dest\alerts.log"
